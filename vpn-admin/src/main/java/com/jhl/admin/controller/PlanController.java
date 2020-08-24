@@ -1,8 +1,8 @@
 package com.jhl.admin.controller;
 
+import com.jhl.admin.VO.UserVO;
 import com.jhl.admin.cache.UserCache;
 import com.jhl.admin.model.Package;
-import com.jhl.admin.model.User;
 import com.jhl.admin.repository.PackageRepository;
 import com.ljh.common.model.Result;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,7 +33,7 @@ public class PlanController {
     public Result findByPage(@CookieValue(value = COOKIE_NAME, defaultValue = "") String auth,Integer page, Integer pageSize) {
         if (page == null || pageSize == null) throw new NullPointerException("page, pageSize不能为空");
 
-        User cache = userCache.getCache(auth);
+        UserVO cache = userCache.getCache(auth);
         String role = cache.getRole();
         Page<Package> pages =null;
         if (role.equals(ROLE_ADMIN)){
@@ -44,7 +44,6 @@ public class PlanController {
             pages = packageRepository.findAll(Example.of(Package.builder().status(V_TRUE).show(V_TRUE).build()),
                     PageRequest.of(page-1, pageSize));
         }
-        if (pages ==null) return Result.SUCCESS();
         return  Result.buildPageObject(pages.getTotalElements(),pages.getContent());
     }
 
@@ -53,7 +52,7 @@ public class PlanController {
     public Result add(@RequestBody Package aPackage) {
         if (aPackage == null) throw new NullPointerException("Package不能为空");
             packageRepository.save(aPackage);
-        return Result.SUCCESS();
+        return Result.doSuccess();
     }
 
     @ResponseBody
@@ -62,17 +61,18 @@ public class PlanController {
         if (aPackage == null) throw new NullPointerException("Package不能为空");
         if (aPackage.getId() ==null) throw  new NullPointerException("id 不能为空");
         packageRepository.save(aPackage);
-        return Result.SUCCESS();
+        return Result.doSuccess();
     }
 
     @ResponseBody
     @DeleteMapping("/plan/{id}")
     public Result delete(@PathVariable  Integer id) {
         if (id !=null) throw new NullPointerException("id不能为空");
-        Package aPackage = packageRepository.findById(id).get();
+        Package aPackage = packageRepository.findById(id).orElse(null);
+        if (aPackage ==null)  throw new NullPointerException("Package is null");
         aPackage.setStatus(0);
         packageRepository.save(aPackage);
-        return Result.SUCCESS();
+        return Result.doSuccess();
     }
 
 

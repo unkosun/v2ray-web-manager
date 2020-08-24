@@ -5,10 +5,6 @@ import com.jhl.admin.model.Stat;
 import com.jhl.admin.repository.StatRepository;
 import com.jhl.admin.util.Utils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Example;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.util.Calendar;
@@ -26,7 +22,7 @@ public class StatService {
      * @param account
      * @return
      */
-    public Stat createStat(Account account){
+    public Stat createOrGetStat(Account account){
         Date today = new Date();
         Stat stat = statRepository.findByAccountIdAndFromDateBeforeAndToDateAfter(account.getId(), today,today);
             if (stat == null){
@@ -44,7 +40,6 @@ public class StatService {
                  statRepository.save(stat);
             }
             return stat;
-
     }
   /*  private void createStat(Account account) {
         Integer accountId = account.getId();

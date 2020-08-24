@@ -2,6 +2,9 @@ package com.jhl.admin.service;
 
 import com.alibaba.fastjson.JSON;
 import com.google.common.collect.Lists;
+import com.jhl.admin.VO.AccountVO;
+import com.jhl.admin.VO.StatVO;
+import com.jhl.admin.VO.UserVO;
 import com.jhl.admin.constant.KVConstant;
 import com.jhl.admin.constant.ProxyConstant;
 import com.jhl.admin.entity.V2rayAccount;
@@ -16,10 +19,10 @@ import com.jhl.admin.util.Utils;
 import com.jhl.admin.util.Validator;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Example;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.Assert;
 
 import java.util.Calendar;
 import java.util.Date;
@@ -71,9 +74,9 @@ public class AccountService {
         Date fromDate = Utils.formatDate(date, null);
         if (account.getFromDate() == null) account.setFromDate(fromDate);
         if (account.getCycle() == null) {
-            account.setCycle(KVConstant.DAY);
+            account.setCycle(KVConstant.MONTH);
         }
-        if (account.getMaxConnection() == null) account.setMaxConnection(32);
+        if (account.getMaxConnection() == null) account.setMaxConnection(64);
         if (account.getToDate() == null)
             account.setToDate(Utils.getDateBy(fromDate, KVConstant.DAY, Calendar.DAY_OF_YEAR));
         account.setStatus(1);
@@ -90,21 +93,21 @@ public class AccountService {
         Validator.isNotNull(account.getId());
         account.setContent(null);
         account.setServerId(null);
-        Account old = accountRepository.findById(account.getId()).orElse(null);
-        Integer serverId = old.getServerId();
+
         accountRepository.save(account);
+        Account account1 = accountRepository.findById(account.getId()).orElse(null);
         //判断是否需要生成新的stat
-        statService.createStat(accountRepository.getOne(account.getId()));
+        statService.createOrGetStat(accountRepository.getOne(account.getId()));
         //删除事件
             proxyEventService.addProxyEvent(
-                    proxyEventService.buildV2RayProxyEvent(old, ProxyEvent.RM_EVENT));
+                    proxyEventService.buildV2RayProxyEvent(account1, ProxyEvent.RM_EVENT));
     }
     @Deprecated
     @Transactional
     public void updateAccountServer(Account account) {
         Integer id = account.getId();
         Account dbAccount = accountRepository.findById(id).orElse(null);
-        if (dbAccount.getStatus() == 0 || !dbAccount.getToDate().after(new Date())) {
+        if (dbAccount ==null|| dbAccount.getStatus() == 0 || !dbAccount.getToDate().after(new Date())) {
             throw new IllegalStateException("账号不可用");
         }
 
@@ -153,17 +156,19 @@ public class AccountService {
      * @param userId
      * @return
      */
-    public List<Account> getAccounts(Integer userId) {
+    public List<AccountVO> getAccounts(Integer userId) {
 
         Date date = new Date();
 
         List<Account> accounts = accountRepository.findAll(Example.of(Account.builder().userId(userId).build()));
-
+            List<AccountVO> accountVOList = Lists.newArrayListWithCapacity(accounts.size());
         accounts.forEach(account -> {
-            fillAccount(date, account);
+            AccountVO accountVO = account.toVO(AccountVO.class);
+            fillAccount(date, accountVO);
+            accountVOList.add(accountVO);
 
         });
-        return accounts;
+        return accountVOList;
     }
 
     public Account getAccount(Integer userId) {
@@ -173,14 +178,14 @@ public class AccountService {
         if (accounts.size() >1) throw new IllegalArgumentException("用户存在多个账号，请修复");
         return accounts.isEmpty()?null:accounts.get(0);
     }
-    public void fillAccount(Date date, Account account) {
+    public void fillAccount(Date date, AccountVO account) {
         Integer accountId = account.getId();
         Stat stat = statRepository.findByAccountIdAndFromDateBeforeAndToDateAfter(accountId, date, date);
 
         Integer userId = account.getUserId();
         User user = userService.getUserButRemovePW(userId);
-        if (user != null) account.setUser(user);
-        if (stat != null) account.setStat(stat);
+        if (user != null) account.setUserVO(user.toVO(UserVO.class));
+        if (stat != null) account.setStatVO(stat.toVO(StatVO.class));
     }
 
     /**
@@ -204,6 +209,7 @@ public class AccountService {
         subscriptionService.addSubscription(subscription);
 
       Account account = accountRepository.findById(accountId).orElse(null);
+      Assert.notNull(account,"account is null");
         long timeStamp =System.currentTimeMillis();
 
         String token = DigestUtils.md5Hex(subscription.getCode()+timeStamp+proxyConstant.getAuthPassword());
@@ -212,6 +218,13 @@ public class AccountService {
         accountRepository.save(account);
     }
 
+    public  Account findByAccountNo(String accountNo){
+        Assert.notNull(accountNo,"accountNo must not be null");
+        Account account = accountRepository.findOne(Example.of(Account.builder()
+                .accountNo(accountNo).status(KVConstant.V_TRUE).build())).orElse(null);
+        return account;
+
+    }
 /*
     public List<Account> listAllAccount(List<User> users) {
         ArrayList<Account> allAccounts = Lists.newArrayList();

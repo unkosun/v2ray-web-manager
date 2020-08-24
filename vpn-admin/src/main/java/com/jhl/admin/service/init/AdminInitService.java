@@ -36,6 +36,7 @@ public class AdminInitService {
     String password;
     @PostConstruct
     public void init() {
+
         ServerConfig initialedConfig = serverConfigRepository.findOne(Example.of(ServerConfig.builder().key("initialed").build())).orElse(null);
 
         if (initialedConfig != null && Boolean.valueOf(initialedConfig.getValue())) return;
@@ -47,7 +48,7 @@ public class AdminInitService {
         Date date = Utils.formatDate( new Date(), null);
         ac.setToDate(Utils.getDateBy(date,365, Calendar.DAY_OF_YEAR));
         accountService.create(ac);
-        statService.createStat(ac);
+        statService.createOrGetStat(ac);
         initialedConfig =new ServerConfig();
         initialedConfig.setKey("initialed");
         initialedConfig.setValue("true");

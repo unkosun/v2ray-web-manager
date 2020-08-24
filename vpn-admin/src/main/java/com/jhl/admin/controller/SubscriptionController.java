@@ -5,14 +5,16 @@ import com.jhl.admin.service.SubscriptionService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.ResponseBody;
 
-import java.util.HashMap;
-import java.util.Map;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
 
 @Slf4j
 @Controller
@@ -29,9 +31,9 @@ public class SubscriptionController {
      * @param  token  md5(code+timestamp+api.auth)
      * @return
      */
-    @ResponseBody
-    @RequestMapping("/subscribe/{code}")
-    public String subscribe(@PathVariable String code,Integer type,  Long timestamp,String token) {
+
+    @RequestMapping(value = "/subscribe/{code}")
+    public void subscribe(@PathVariable String code, Integer type, Long timestamp, String token, HttpServletResponse response) throws IOException {
          if (code==null||type==null ||  timestamp==null || token ==null)  throw  new NullPointerException("参数错误");
 
          StringBuilder stringBuilder= new StringBuilder();
@@ -39,7 +41,10 @@ public class SubscriptionController {
         if (!DigestUtils.md5Hex(tokenSrc.toString()).equals(token)) throw  new RuntimeException("认证失败");
 
         String result = subscriptionService.subscribe(code);
-
-        return result;
+        byte[] bytes = result.getBytes();
+        response.setHeader("Content-Length",bytes.length+"");
+        response.setHeader("Content-Type", MediaType.APPLICATION_OCTET_STREAM_VALUE);
+        response.getOutputStream().write(bytes);
+        response.flushBuffer();
     }
 }

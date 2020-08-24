@@ -5,10 +5,11 @@ import lombok.Setter;
 
 import java.io.Serializable;
 
+
 @Getter
 @Setter
 public class ProxyAccount implements Serializable {
-    public final static Long M = 1024 * 1024L;
+    public static final  Long M = 1024 * 1024L;
     /**
      * 账号ID,用于标识 连接属于谁
      */
@@ -52,6 +53,10 @@ public class ProxyAccount implements Serializable {
     private String v2rayHost = "127.0.0.1";
     private int v2rayPort = 6001;
     private int v2rayManagerPort = 62789;
+    /**
+     * 代理中间件的ip
+     */
+    private  String proxyIp;
 
 
 }

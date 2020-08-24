@@ -1,5 +1,6 @@
 package com.jhl.admin.service;
 
+import com.jhl.admin.VO.UserVO;
 import com.jhl.admin.cache.DefendBruteForceAttackUser;
 import com.jhl.admin.model.Account;
 import com.jhl.admin.model.User;
@@ -11,6 +12,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Example;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
@@ -44,7 +49,7 @@ public class UserService {
         create(user);
         Account account = Account.builder().userId(user.getId()).build();
         accountService.create(account);
-        StatService.createStat(account);
+        StatService.createOrGetStat(account);
     }
 
     public void changePassword(User user) {
@@ -57,13 +62,32 @@ public class UserService {
         if (dbUser == null) {
             throw new NullPointerException("用户不存在");
         }
-        User newUser = User.builder().password(DigestUtils.md5Hex(user.getPassword()))
+        User newUser = User.builder().password(encodePassword(user.getPassword()))
                 .build();
         newUser.setId(dbUser.getId());
         userRepository.save(newUser);
         //删除访问限制
         defendBruteForceAttackUser.rmCache(user.getEmail());
+    }
 
+    /**
+     * @param userId
+     * @param oldPw  旧密码
+     * @param newPw  新你们
+     */
+    public void changePassword(Integer userId, String oldPw, String newPw) {
+        Validator.isNotNull(userId);
+        Validator.isNotNull(oldPw);
+        Validator.isNotNull(newPw);
+        User user = userRepository.findById(userId).orElse(null);
+        if (user == null) {
+            throw new NullPointerException("用户不存在");
+        }
+        String password = user.getPassword();
+
+        if (!encodePassword(oldPw).equals(password)) throw new RuntimeException("旧密码不正确");
+        user.setPassword(encodePassword(newPw));
+        userRepository.save(user);
     }
 
     public void create(User user) {
@@ -74,7 +98,7 @@ public class UserService {
         userRepository.save(user);
     }
 
-    public User login(User user) {
+    public User login(UserVO user) {
         Validator.isNotNull(user);
         String email = user.getEmail();
         Validator.isNotNull(email, "email为空");
@@ -110,13 +134,36 @@ public class UserService {
         return userRepository.findById(id).orElse(null);
     }
 
+    public Map<Integer, User> getUserMapBy(Iterable<Integer> ids) {
+        Map<Integer, User> userMap = new HashMap<>();
+        if (ids == null) return userMap;
+        final List<User> regUsers = userRepository.findAllById(ids);
+        regUsers.forEach(user1 -> userMap.put(user1.getId(), user1));
+
+        return userMap;
+    }
+
+    public UserVO getOne(User user) {
+        user.setStatus(1);
+        Optional<User> one = userRepository.findOne(Example.of(user));
+        if (!one.isPresent()) return null;
+        UserVO userVO = one.get().toVO(UserVO.class);
+        userVO.setPassword(null);
+        return userVO;
+    }
+
+    public User getOneByAdmin(User user) {
+        user.setStatus(1);
+        Optional<User> one = userRepository.findOne(Example.of(user));
+        return one.orElse(null);
+    }
 
     public User getUserButRemovePW(
-            Integer id  ) {
+            Integer id) {
 
         User user = get(id);
-        if (user !=null)
-        user.setPassword(null);
+        if (user != null)
+            user.setPassword(null);
         return user;
     }
 
@@ -125,5 +172,9 @@ public class UserService {
         user.setId(userId);
         user.setRemark(remark);
         userRepository.save(user);
+    }
+
+    public String encodePassword(String pw) {
+        return DigestUtils.md5Hex(pw);
     }
 }
